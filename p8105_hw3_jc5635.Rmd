@@ -4,5 +4,63 @@ output: github_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE,
+                      fig.width = 10,
+                      fig.asp = .7,
+                      out.width = "100%")
 ```
+
+```{r initial}
+library(tidyverse)
+library(ggridges)
+library(patchwork)
+```
+
+## Problem 2: Accelerometer Data
+
+```{r long}
+accel_long = read_csv(file = "data/accel_data.csv") %>%
+  janitor::clean_names() %>%
+  mutate(day = factor(day, c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))) %>%
+  pivot_longer(activity_1:activity_1440,
+               names_to = "minute",
+               names_prefix = "activity_",
+               values_to = "activity_meas_min") %>%
+  mutate(day_type = ifelse(day == "Saturday" | day == "Sunday", "Weekend", "Weekday"),
+         day_type = factor(day_type),
+         minute = as.numeric(minute)) %>%
+  arrange(week, day, minute)
+
+head(accel_long, 10)
+```
+
+```{r summary}
+accel_long %>%
+  group_by(week, day) %>%
+  summarise(activity_meas_day = sum(activity_meas_min)) %>%
+  pivot_wider(names_from = day,
+              values_from = activity_meas_day) %>%
+  knitr::kable()
+```
+
+```{r plot}
+ggplot(accel_long, aes(x = minute, y = activity_meas_min, color = day)) +
+  geom_smooth(se = FALSE, alpha = 1, size = 1) + 
+  scale_x_continuous(
+  breaks = c(120, 240, 360, 480, 600, 720, 840, 960, 1080, 1200, 1320, 1440),
+  labels = c("2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24")
+) + 
+  labs(
+    title = "Activity over 24-hour time course for a CHF patient admitted at CUMC",
+    x = "Hour of the day (midnight = 0)",
+    y = "Activity counts (LOESS-smoothed)",
+    caption = "From five-week accelerometer data collected on a 63-year-old male with CHF"
+  ) +
+  viridis::scale_color_viridis(
+    name = "Day",
+    discrete = TRUE
+  ) + theme(legend.position = "bottom",
+            plot.title = element_text(hjust = .5))
+```
+
