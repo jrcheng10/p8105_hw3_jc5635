@@ -6,18 +6,17 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, 
                       message = FALSE,
+                      warning = FALSE,
                       fig.width = 10,
                       fig.asp = .7,
                       out.width = "100%")
-```
 
-```{r initial}
 library(tidyverse)
 library(ggridges)
 library(patchwork)
 ```
 
-## Problem 2: Accelerometer Data
+## Problem 2
 
 ```{r long}
 accel_long = read_csv(file = "data/accel_data.csv") %>%
@@ -26,7 +25,7 @@ accel_long = read_csv(file = "data/accel_data.csv") %>%
   pivot_longer(activity_1:activity_1440,
                names_to = "minute",
                names_prefix = "activity_",
-               values_to = "activity_meas_min") %>%
+               values_to = "activity_meas_minute") %>%
   mutate(day_type = ifelse(day == "Saturday" | day == "Sunday", "Weekend", "Weekday"),
          day_type = factor(day_type),
          minute = as.numeric(minute)) %>%
@@ -38,24 +37,24 @@ head(accel_long, 10)
 ```{r summary}
 accel_long %>%
   group_by(week, day) %>%
-  summarise(activity_meas_day = sum(activity_meas_min)) %>%
+  summarise(activity_meas_day = sum(activity_meas_minute)) %>%
   pivot_wider(names_from = day,
               values_from = activity_meas_day) %>%
   knitr::kable()
 ```
 
 ```{r plot}
-ggplot(accel_long, aes(x = minute, y = activity_meas_min, color = day)) +
+ggplot(accel_long, aes(x = minute, y = activity_meas_minute, color = day)) +
   geom_smooth(se = FALSE, alpha = 1, size = 1) + 
   scale_x_continuous(
   breaks = c(120, 240, 360, 480, 600, 720, 840, 960, 1080, 1200, 1320, 1440),
   labels = c("2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "22", "24")
-) + 
+) +
   labs(
-    title = "Activity over 24-hour time course for a CHF patient admitted at CUMC",
-    x = "Hour of the day (midnight = 0)",
+    title = "24-hour activity time course for a CHF patient",
+    x = "Hour of the day (0 = midnight)",
     y = "Activity counts (LOESS-smoothed)",
-    caption = "From five-week accelerometer data collected on a 63-year-old male with CHF"
+    caption = "Source: CUMC"
   ) +
   viridis::scale_color_viridis(
     name = "Day",
@@ -64,3 +63,95 @@ ggplot(accel_long, aes(x = minute, y = activity_meas_min, color = day)) +
             plot.title = element_text(hjust = .5))
 ```
 
+## Problem 3
+
+```{r initial}
+library(p8105.datasets)
+data("ny_noaa")
+
+skimr::skim(ny_noaa)
+```
+
+We first import and review the `ny_noaa` dataset. The data contains `r nrow(ny_noaa)` rows and `r ncol(ny_noaa)` columns, including an `id` variable denoting weather station, a `date` variable for the observation date, and several weather measures (e.g. `snow` for snowfall, `tmax` for maximum temperature, and `tmin` for minimum temperature). There are no missing values on `id` or `date`. `tmax` and `tmin` each contain data on only 56 percent of observations, while the `snwd`, `snow`, and `prcp` variables exhibit higher rates of complete data (77 percent, 85 percent, and 94 percent, respectively). 
+
+```{r tidy}
+noaa_clean = ny_noaa %>%
+  separate(date, into = c("year", "month", "day"), sep = "-", convert = TRUE) %>%
+  mutate(tmax_c = as.integer(tmax) / 10, # convert tenths of C to C
+         tmin_c = as.integer(tmin) / 10, # convert tenths of C to C
+         prcp_cm = prcp / 100, # convert tenths of mm to cm
+         snow_cm = snow / 10, # convert mm to cm 
+         snwd_cm = snwd / 10) %>% # convert mm to cm 
+  rename(snow_mm = snow) %>%
+  select(-c(5, 7:9)) %>%
+  relocate(snow_mm, .after = prcp_cm)
+
+head(noaa_clean, 10)
+
+noaa_clean %>%
+  group_by(snow_mm) %>%
+  summarise(values_count = n()) %>%
+  arrange(desc(values_count)) %>%
+  head(5)
+
+noaa_clean %>%
+  group_by(month) %>%
+  summarise(mean_snow_mm = mean(snow_mm, na.rm = TRUE))
+```
+
+We proceed to tidy the data by disaggregating `date` into `year`, `month`, and `day` variables; converting units on `tmax` and `tmin` to degrees Celsius; converting units on `prcp`, `snow`, and `snwd` to centimeters; and relabeling variables as necessary, among other cleaning steps. `0` is the most commonly observed value on `snow_mm` (i.e. the original variable `snow`, renamed), recorded in 2008508 observations, as there is minimal snowfall observed during certain months of the year; in fact, average snowfall (in millimeters) is 0.002 or less in June, July, August, and September. `NA` is the second most commonly observed value on `snow_mm`, recorded in 381221 observations, likely due to stations not collecting data on snowfall (among other fields), as noted in the available documentation for the NOAA dataset.
+
+```{r two_panel_plot_i}
+noaa_clean %>%
+  filter(month %in% c(1, 7)) %>%
+  mutate(month = ifelse(test = month == 1, "January", "July")) %>%
+  group_by(id, year, month) %>% 
+  summarise(tmax_avg = mean(tmax_c)) %>%
+  ggplot(aes(x = year, y = tmax_avg, color = id)) +
+  geom_point(alpha = .5) +
+  geom_line() +
+  facet_grid(~month) +
+  labs(
+    title = "Average maximum temperatures in January and July, across years and by station",
+    x = "Year",
+    y = "Average maximum temperature (in degrees Celsius)",
+    caption = "Source: NOAA"
+  ) +
+  viridis::scale_fill_viridis(discrete = TRUE) +
+  theme(legend.position = "none",
+            plot.title = element_text(hjust = .5))
+```
+
+Average maximum temperatures by station in January have tended to fall within the -10 to 10 degrees Celsius range across years, with some outliers below -10 degrees Celsius recorded in the early 1980s, the mid-1990s, and the mid-aughts. 
+Average maximum temperatures by station in July have tended to fall within the 20 to 35 degrees Celsius range across years, with a handful of outliers below 20 degrees Celsius recorded in the 1980s and the aughts. The highest average maximum temperature in July for any station appears to have been recorded in 2010.
+
+```{r two_panel_plot_ii, fig.width = 8, fig.asp = 1.8}
+tmax_v_tmin = noaa_clean %>%
+  ggplot(aes(x = tmin_c, y = tmax_c)) +
+  geom_hex(size = .5) +
+  labs(
+    title = "Average maximum temperatures vs. average minimum temperatures",
+    x = "Average minimum temperature (in degrees Celsius)",
+    y = "Average maximum temperature (in degrees Celsius)",
+    caption = "Source: NOAA"
+  ) +
+    theme(plot.title = element_text(hjust = .5))
+
+snow_dist = noaa_clean %>%
+  filter(snow_mm > 0 & snow_mm < 100) %>%
+  mutate(year = as.factor(year)) %>%
+  ggplot(aes(x = snow_mm, y = year)) +
+  geom_density_ridges(scale = .8) +
+  labs(
+    title = "Distributions of snowfalls above 0 millimeters and below 100 millimeters, by year",
+    x = "Snowfall (in millimeters)",
+    y = "Year",
+    caption = "Source: NOAA"
+  ) +
+    theme(plot.title = element_text(hjust = .5))
+# note: uses original units on snow, per 10/12 instruction
+  
+tmax_v_tmin / snow_dist
+```
+
+The first panel (i.e. hexagonal heatmap) appears to show a positive relationship between average minimum temperatures and average maximum temperatures by station. The second panel (i.e. ridge plot) suggests some consistency in overall distribution patterns for snowfall across years, albeit with less pronounced concentrations of snowfalls above 40 millimeters in the latter years.
