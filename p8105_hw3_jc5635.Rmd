@@ -29,10 +29,12 @@ accel_long = read_csv(file = "data/accel_data.csv") %>%
   mutate(day_type = ifelse(day == "Saturday" | day == "Sunday", "Weekend", "Weekday"),
          day_type = factor(day_type),
          minute = as.numeric(minute)) %>%
-  arrange(week, day, minute)
+  arrange(week, day_id, day, minute)
 
 head(accel_long, 10)
 ```
+
+We import and tidy the `accel_data` (i.e. as `accel_long`) by setting `day` as a factor variable, pivoting `activity_*` to long format, adding a `day_type` variable to distinguish weekdays and weekend days from one another, and defining `minute` as a numeric variable, among other cleaning steps. The resulting dataset contains `r nrow(accel_long)` rows and `r ncol(accel_long)` fields, i.e. temporal variables (e.g. `week`, `day`, `minute`, and `day_type`) and activity counts by minute, as denoted by `activity_meas_minute`.
 
 ```{r summary}
 accel_long %>%
@@ -40,8 +42,13 @@ accel_long %>%
   summarise(activity_meas_day = sum(activity_meas_minute)) %>%
   pivot_wider(names_from = day,
               values_from = activity_meas_day) %>%
+  janitor::adorn_totals() %>%
   knitr::kable()
+
+# note: total activity counts for Saturday in weeks 4 and 5 are 1440 each (i.e. number of minutes in a day; may merit further investigation) 
 ```
+
+Total daily activity counts for the full five-week data collection period are highest for Wednesday, Thursday, and Friday (2129772, 2091150.6, and 2291710.6, respectively), and lowest for Saturday (1369237).
 
 ```{r plot}
 ggplot(accel_long, aes(x = minute, y = activity_meas_minute, color = day)) +
@@ -63,6 +70,8 @@ ggplot(accel_long, aes(x = minute, y = activity_meas_minute, color = day)) +
             plot.title = element_text(hjust = .5))
 ```
 
+The plot above displays 24-hour (LOESS-smoothed) curves for activity counts for each day. For the individual in question, average activity counts appear to fall in or near the 300 to 450 range between 9am and 4pm on weekdays, while average activity counts trend below this range on Saturdays and exceed this range substantially on Sundays, with the Sunday average peaking above 600 before 11am. The LOESS-smoothed curve for activity counts on Friday rises above 450 around 7pm and peaks above 800 around 9pm, similarly suggesting a period of heightened activity.
+
 ## Problem 3
 
 ```{r initial}
@@ -72,8 +81,7 @@ data("ny_noaa")
 skimr::skim(ny_noaa)
 ```
 
-We first import and review the `ny_noaa` dataset. The data contains `r nrow(ny_noaa)` rows and `r ncol(ny_noaa)` columns, including an `id` variable denoting weather station, a `date` variable for the observation date, and several weather measures (e.g. `snow` for snowfall, `tmax` for maximum temperature, and `tmin` for minimum temperature). There are no missing values on `id` or `date`. `tmax` and `tmin` each contain data on only 56 percent of observations, while the `snwd`, `snow`, and `prcp` variables exhibit higher rates of complete data (77 percent, 85 percent, and 94 percent, respectively). 
-
+We first import and review the `ny_noaa` dataset. The data contains `r nrow(ny_noaa)` rows and `r ncol(ny_noaa)` fields, including an `id` variable denoting weather station, a `date` variable for the observation date, and several weather measures (e.g. `snow` for snowfall, `tmax` for maximum temperature, and `tmin` for minimum temperature). There are no missing values on `id` or `date`. `tmax` and `tmin` each contain data on only 56 percent of observations, while the `snwd`, `snow`, and `prcp` variables exhibit higher rates of complete data (77 percent, 85 percent, and 94 percent, respectively). 
 ```{r tidy}
 noaa_clean = ny_noaa %>%
   separate(date, into = c("year", "month", "day"), sep = "-", convert = TRUE) %>%
@@ -122,8 +130,7 @@ noaa_clean %>%
             plot.title = element_text(hjust = .5))
 ```
 
-Average maximum temperatures by station in January have tended to fall within the -10 to 10 degrees Celsius range across years, with some outliers below -10 degrees Celsius recorded in the early 1980s, the mid-1990s, and the mid-aughts. 
-Average maximum temperatures by station in July have tended to fall within the 20 to 35 degrees Celsius range across years, with a handful of outliers below 20 degrees Celsius recorded in the 1980s and the aughts. The highest average maximum temperature in July for any station appears to have been recorded in 2010.
+Average maximum temperatures by station in January, as shown in the above plot, have tended to fall within the -10 to 10 degrees Celsius range across years, with some outliers below -10 degrees Celsius recorded in the early 1980s, the mid-1990s, and the mid-aughts. Average maximum temperatures by station in July have tended to fall within the 20 to 35 degrees Celsius range across years, with a handful of outliers below 20 degrees Celsius recorded in the 1980s and the aughts. The highest average maximum temperature in July for any station appears to have been recorded in 2010.
 
 ```{r two_panel_plot_ii, fig.width = 8, fig.asp = 1.8}
 tmax_v_tmin = noaa_clean %>%
