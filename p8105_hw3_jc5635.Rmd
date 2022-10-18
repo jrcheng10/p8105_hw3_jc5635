@@ -18,7 +18,7 @@ library(patchwork)
 
 ## Problem 2
 
-```{r long}
+```{r accel_tidy}
 accel_long = read_csv(file = "data/accel_data.csv") %>%
   janitor::clean_names() %>%
   mutate(day = factor(day, c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))) %>%
@@ -36,7 +36,7 @@ head(accel_long, 10)
 
 We import and tidy the `accel_data` (i.e. as `accel_long`) by setting `day` as a factor variable, pivoting `activity_*` to long format, adding a `day_type` variable to distinguish weekdays and weekend days from one another, and defining `minute` as a numeric variable, among other cleaning steps. The resulting dataset contains `r nrow(accel_long)` rows and `r ncol(accel_long)` fields, i.e. temporal variables (e.g. `week`, `day`, `minute`, and `day_type`) and activity counts by minute, as denoted by `activity_meas_minute`.
 
-```{r summary}
+```{r accel_summary}
 accel_long %>%
   group_by(week, day) %>%
   summarise(activity_meas_day = sum(activity_meas_minute)) %>%
@@ -50,7 +50,7 @@ accel_long %>%
 
 Total daily activity counts for the full five-week data collection period are highest for Wednesday, Thursday, and Friday (2129772, 2091150.6, and 2291710.6, respectively), and lowest for Saturday (1369237).
 
-```{r plot}
+```{r accel_plot}
 ggplot(accel_long, aes(x = minute, y = activity_meas_minute, color = day)) +
   geom_smooth(se = FALSE, alpha = 1, size = 1) + 
   scale_x_continuous(
@@ -74,7 +74,7 @@ The plot above displays 24-hour (LOESS-smoothed) curves for activity counts for 
 
 ## Problem 3
 
-```{r initial}
+```{r noaa_initial}
 library(p8105.datasets)
 data("ny_noaa")
 
@@ -82,7 +82,8 @@ skimr::skim(ny_noaa)
 ```
 
 We first import and review the `ny_noaa` dataset. The data contains `r nrow(ny_noaa)` rows and `r ncol(ny_noaa)` fields, including an `id` variable denoting weather station, a `date` variable for the observation date, and several weather measures (e.g. `snow` for snowfall, `tmax` for maximum temperature, and `tmin` for minimum temperature). There are no missing values on `id` or `date`. `tmax` and `tmin` each contain data on only 56 percent of observations, while the `snwd`, `snow`, and `prcp` variables exhibit higher rates of complete data (77 percent, 85 percent, and 94 percent, respectively). 
-```{r tidy}
+
+```{r noaa_tidy}
 noaa_clean = ny_noaa %>%
   separate(date, into = c("year", "month", "day"), sep = "-", convert = TRUE) %>%
   mutate(tmax_c = as.integer(tmax) / 10, # convert tenths of C to C
@@ -109,7 +110,7 @@ noaa_clean %>%
 
 We proceed to tidy the data by disaggregating `date` into `year`, `month`, and `day` variables; converting units on `tmax` and `tmin` to degrees Celsius; converting units on `prcp`, `snow`, and `snwd` to centimeters; and relabeling variables as necessary, among other cleaning steps. `0` is the most commonly observed value on `snow_mm` (i.e. the original variable `snow`, renamed), recorded in 2008508 observations, as there is minimal snowfall observed during certain months of the year; in fact, average snowfall (in millimeters) is 0.002 or less in June, July, August, and September. `NA` is the second most commonly observed value on `snow_mm`, recorded in 381221 observations, likely due to stations not collecting data on snowfall (among other fields), as noted in the available documentation for the NOAA dataset.
 
-```{r two_panel_plot_i}
+```{r noaa_two_panel_plot_i}
 noaa_clean %>%
   filter(month %in% c(1, 7)) %>%
   mutate(month = ifelse(test = month == 1, "January", "July")) %>%
@@ -132,7 +133,7 @@ noaa_clean %>%
 
 Average maximum temperatures by station in January, as shown in the above plot, have tended to fall within the -10 to 10 degrees Celsius range across years, with some outliers below -10 degrees Celsius recorded in the early 1980s, the mid-1990s, and the mid-aughts. Average maximum temperatures by station in July have tended to fall within the 20 to 35 degrees Celsius range across years, with a handful of outliers below 20 degrees Celsius recorded in the 1980s and the aughts. The highest average maximum temperature in July for any station appears to have been recorded in 2010.
 
-```{r two_panel_plot_ii, fig.width = 8, fig.asp = 1.8}
+```{r noaa_two_panel_plot_ii, fig.width = 8, fig.asp = 1.8}
 tmax_v_tmin = noaa_clean %>%
   ggplot(aes(x = tmin_c, y = tmax_c)) +
   geom_hex(size = .5) +
