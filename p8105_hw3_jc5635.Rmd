@@ -7,14 +7,80 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE, 
                       message = FALSE,
                       warning = FALSE,
-                      fig.width = 10,
-                      fig.asp = .7,
                       out.width = "100%")
 
 library(tidyverse)
 library(ggridges)
 library(patchwork)
 ```
+
+## Problem 1
+
+```{r initial}
+library(p8105.datasets)
+data("instacart")
+
+head(instacart, 5)
+```
+
+The `instacart` dataset contains `nrow(instacart)` rows and `r ncol(instacart)` columns, such as `order_id`, `product_id`, `user_id`, `order_number`, and `product_name`.
+
+```{r insta_orders}
+insta_orders = instacart %>%
+  mutate(aisle = as.factor(aisle)) %>%
+  group_by(aisle) %>%
+  summarise(order_count = n_distinct(order_id)) %>%
+  arrange(desc(order_count))
+
+head(insta_orders, 5)
+```
+
+There are `r instacart %>% select(aisle_id) %>% n_distinct` distinct aisles. `fresh fruits` and `fresh vegetables` are the aisles with the highest order counts.
+
+```{r insta_plot}
+insta_orders %>%
+  filter(order_count > 10000) %>%
+  mutate(aisle = fct_reorder(aisle, order_count, .desc = TRUE)) %>%
+  ggplot(aes(x = aisle, y = order_count)) +
+  geom_point() +
+  labs(
+    title = "Order counts by aisle",
+    x = "Aisle",
+    y = "Number of orders",
+    caption = "Source: Instacart"
+  ) +
+  theme(plot.title = element_text(hjust = .5),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+`paper goods` and `canned jarred vegetables` are the least popular aisles.
+
+```{r insta_pop_items}
+instacart %>%
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>%
+  mutate(product_name = as.factor(product_name)) %>%
+  group_by(aisle, product_name) %>%
+  summarise(order_count = n_distinct(order_id)) %>%
+  mutate(rank = min_rank(desc(order_count))) %>%
+  filter(rank < 4) %>%
+  arrange(aisle, rank) %>%
+  select(-rank) %>%
+  knitr::kable()
+```
+
+The most popular item in `packaged vegetables fruits` is `Organic Baby Spinach`.
+
+```{r insta_prod_order_time}
+instacart %>%
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) %>%
+  group_by(product_name, order_dow) %>%
+  summarise(mean_hr = mean(order_hour_of_day)) %>%
+  pivot_wider(names_from = product_name,
+              values_from = mean_hr) %>%
+  knitr::kable(digits = 1)
+```
+    
+On average, Coffee Ice Cream orders tend to be placed after noon and before 4pm, whereas Pink Lady Apples orders tend to be placed between 11am and 3pm.
 
 ## Problem 2
 
